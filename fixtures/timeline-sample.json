@@ -1,0 +1,49 @@
+{
+  "semanticSegments": [
+    {
+      "startTime": "2024-01-01T09:00:00+01:00",
+      "endTime": "2024-01-01T10:00:00+01:00",
+      "visit": {
+        "topCandidate": {
+          "placeId": "place-home",
+          "semanticType": "HOME",
+          "probability": 0.99,
+          "placeLocation": {
+            "latLng": "52.1°, 6.1°"
+          }
+        }
+      }
+    },
+    {
+      "startTime": "2024-01-01T10:00:00+01:00",
+      "endTime": "2024-01-01T10:30:00+01:00",
+      "activity": {
+        "start": {
+          "latLng": "52.1°, 6.1°"
+        },
+        "end": {
+          "latLng": "52.2°, 6.2°"
+        },
+        "distanceMeters": 1000,
+        "topCandidate": {
+          "type": "WALKING",
+          "probability": 0.75
+        }
+      }
+    },
+    {
+      "startTime": "2024-01-01T10:00:00+01:00",
+      "endTime": "2024-01-01T10:30:00+01:00",
+      "timelinePath": [
+        {
+          "point": "52.15°, 6.15°",
+          "time": "2024-01-01T10:15:00+01:00"
+        },
+        {
+          "point": "52.2°, 6.2°",
+          "time": "2024-01-01T10:30:00+01:00"
+        }
+      ]
+    }
+  ]
+}

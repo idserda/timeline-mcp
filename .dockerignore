@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.git/
+coverage/
+*.db
+*.db-shm
+*.db-wal
+.timeline-data/
+Timeline.json
+Tijdlijn.json
+*.log
+docs/

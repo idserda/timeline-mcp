@@ -1,0 +1,10 @@
+{
+  "placeIds": {
+    "place-home": "Home",
+    "place-office": "Office"
+  },
+  "semanticTypes": {
+    "HOME": "Home",
+    "WORK": "Office"
+  }
+}
