@@ -4,6 +4,7 @@ dist/
 *.db
 *.db-shm
 *.db-wal
+*.sqlite
 coverage/
 .idea/
 .timeline-data/
@@ -11,3 +12,4 @@ Timeline.json
 Tijdlijn.json
 *.log
 docs/
+*.env

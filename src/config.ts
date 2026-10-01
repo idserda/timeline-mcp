@@ -8,6 +8,7 @@ export type TimelineConfig = {
   googlePlacesLanguage?: string;
   logLevel?: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
   logFile?: string;
+  transport?: 'http' | 'stdio';
   httpHost?: string;
   httpPort?: number;
 };
@@ -15,6 +16,7 @@ export type TimelineConfig = {
 export function loadConfig(env: NodeJS.ProcessEnv): TimelineConfig {
   const jsonPath = env.TIMELINE_JSON_PATH;
   const dbPath = env.TIMELINE_DB_PATH;
+  const transport = env.TIMELINE_TRANSPORT || 'stdio';
   const httpHost = env.TIMELINE_HTTP_HOST || '0.0.0.0';
   const httpPort = Number.parseInt(env.TIMELINE_HTTP_PORT ?? '3000', 10);
 
@@ -34,6 +36,10 @@ export function loadConfig(env: NodeJS.ProcessEnv): TimelineConfig {
     throw new Error('TIMELINE_GOOGLE_PLACES_REQUESTS_PER_MINUTE must be a positive number');
   }
 
+  if (transport !== 'http' && transport !== 'stdio') {
+    throw new Error('TIMELINE_TRANSPORT must be "http" or "stdio"');
+  }
+
   if (!Number.isInteger(httpPort)) {
     throw new Error('TIMELINE_HTTP_PORT must be a valid integer');
   }
@@ -48,6 +54,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): TimelineConfig {
     googlePlacesLanguage: env.TIMELINE_GOOGLE_PLACES_LANGUAGE || undefined,
     logLevel: (env.TIMELINE_LOG_LEVEL as TimelineConfig['logLevel']) || undefined,
     logFile: env.TIMELINE_LOG_FILE || undefined,
+    transport,
     httpHost,
     httpPort
   };

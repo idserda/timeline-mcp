@@ -2,7 +2,7 @@
 
 An MCP server that lets an AI assistant answer questions about your Google Timeline: *"Where was I on 3 March?"*, *"When was I at the bakery in Meppel?"*, *"How far did I cycle last week?"*.
 
-It reads a Timeline export, indexes it into SQLite, and serves it over MCP's streamable HTTP transport. Your data stays on your machine, except for the optional place lookups described below.
+It reads a Timeline export, indexes it into SQLite, and serves it over MCP (stdio or streamable HTTP). Your data stays on your machine, except for the optional place lookups described below.
 
 ## Export your Timeline (Android)
 
@@ -17,36 +17,43 @@ Menu names can differ slightly per Android version and manufacturer.
 
 This server supports the **new on-device export format**: one JSON file with a top-level `semanticSegments` array. The older Google Takeout export (`Records.json`, `Semantic Location History/`) is not supported.
 
-## Quick start (Docker)
+## Getting started
+
+Requires Node.js 22+. `npx` downloads this repository, builds it, and runs it over stdio, so there is nothing to clone or keep running:
+
+```bash
+claude mcp add timeline \
+  -e TIMELINE_JSON_PATH=/absolute/path/to/Timeline.json \
+  -e TIMELINE_DB_PATH=/absolute/path/to/timeline.db \
+  -- npx -y github:idserda/timeline-mcp
+```
+
+- **Windows:** use `cmd /c npx …` as the command.
+- **Versions:** the first start is slower while npm builds the package; it is cached afterwards. Pin a version with `github:idserda/timeline-mcp#v0.1.0`, or run `npx clear-npx-cache` to pick up the latest `master`.
+- **Updates to your export:** the index is rebuilt automatically on the next start when the export file has changed.
+
+Run `claude mcp list` to check that the server connects.
+
+## Running as an HTTP server (Docker)
+
+To run one long-lived server that several clients can share:
 
 ```bash
 docker build -t timeline-mcp .
 
-docker run --rm -p 3000:3000 \
-  -e TIMELINE_JSON_PATH=/data/Timeline.json \
-  -e TIMELINE_DB_PATH=/data/state/timeline.db \
-  -e TIMELINE_GEOCODER_USER_AGENT="timeline-mcp (you@example.com)" \
+docker run -d --name timeline-mcp --restart unless-stopped \
+  -p 3000:3000 \
+  --env-file timeline.env \
   -v "$PWD/Timeline.json:/data/Timeline.json:ro" \
   -v "$PWD/.timeline-data:/data/state" \
   timeline-mcp
-```
 
-The MCP endpoint is `http://localhost:3000/mcp`, and `http://localhost:3000/health` returns `ok`. Connect a client, for example:
-
-```bash
 claude mcp add --transport http timeline http://localhost:3000/mcp
 ```
 
-The index is built on startup and rebuilt automatically when the export file has changed, so restart the server after replacing the file.
+`timeline.env` holds the [configuration](#configuration) as `NAME=value` lines, at least `TIMELINE_JSON_PATH=/data/Timeline.json` and `TIMELINE_DB_PATH=/data/state/timeline.db`. The `.timeline-data/` folder keeps the database, so lookups survive restarts. `/health` returns `ok`.
 
-### Without Docker
-
-Requires Node.js 22+.
-
-```bash
-npm install
-TIMELINE_JSON_PATH=/path/to/Timeline.json TIMELINE_DB_PATH=/path/to/timeline.db npm run dev
-```
+**Security:** the HTTP server has no authentication and is reachable from your network, so only run it on trusted networks. To keep it local to the machine, publish the port as `-p 127.0.0.1:3000:3000`.
 
 ## Configuration
 
@@ -54,8 +61,9 @@ TIMELINE_JSON_PATH=/path/to/Timeline.json TIMELINE_DB_PATH=/path/to/timeline.db 
 |---|---|---|
 | `TIMELINE_JSON_PATH` | *required* | Path to the Timeline export. |
 | `TIMELINE_DB_PATH` | *required* | Path to the SQLite index (created if missing). |
-| `TIMELINE_HTTP_HOST` | `0.0.0.0` | Address to listen on. |
-| `TIMELINE_HTTP_PORT` | `3000` | Port to listen on. |
+| `TIMELINE_TRANSPORT` | `stdio` | `stdio` or `http` (the Docker image defaults to `http`). |
+| `TIMELINE_HTTP_HOST` | `0.0.0.0` | Address to listen on (HTTP only). |
+| `TIMELINE_HTTP_PORT` | `3000` | Port to listen on (HTTP only). |
 | `TIMELINE_ALIASES_PATH` | | Optional [aliases file](#aliases). |
 | `TIMELINE_GEOCODER_USER_AGENT` | `timeline-mcp/0.1.0` | Identifies you to OpenStreetMap; set this to something with contact info. |
 | `TIMELINE_GOOGLE_PLACES_API_KEY` | | Enables [place names](#place-names). |
@@ -63,36 +71,6 @@ TIMELINE_JSON_PATH=/path/to/Timeline.json TIMELINE_DB_PATH=/path/to/timeline.db 
 | `TIMELINE_GOOGLE_PLACES_REQUESTS_PER_MINUTE` | `60` | Pace of Google lookups. |
 | `TIMELINE_LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARN`, or `ERROR`. Logs go to stderr. |
 | `TIMELINE_LOG_FILE` | | Also append logs to this file. |
-
-### Full Docker example
-
-Every setting, with the export, aliases file, database, and log file on the host:
-
-```bash
-docker run -d --name timeline-mcp --restart unless-stopped \
-  -p 3000:3000 \
-  -e TIMELINE_JSON_PATH=/data/Timeline.json \
-  -e TIMELINE_DB_PATH=/data/state/timeline.db \
-  -e TIMELINE_HTTP_HOST=0.0.0.0 \
-  -e TIMELINE_HTTP_PORT=3000 \
-  -e TIMELINE_ALIASES_PATH=/data/aliases.json \
-  -e TIMELINE_GEOCODER_USER_AGENT="timeline-mcp (you@example.com)" \
-  -e TIMELINE_GOOGLE_PLACES_API_KEY=your-google-api-key \
-  -e TIMELINE_GOOGLE_PLACES_LANGUAGE=nl \
-  -e TIMELINE_GOOGLE_PLACES_REQUESTS_PER_MINUTE=60 \
-  -e TIMELINE_LOG_LEVEL=INFO \
-  -e TIMELINE_LOG_FILE=/data/state/timeline-mcp.log \
-  -v "$PWD/Timeline.json:/data/Timeline.json:ro" \
-  -v "$PWD/aliases.json:/data/aliases.json:ro" \
-  -v "$PWD/.timeline-data:/data/state" \
-  timeline-mcp
-```
-
-- Inside the container, keep `TIMELINE_HTTP_HOST=0.0.0.0`. If you change `TIMELINE_HTTP_PORT`, change the container side of `-p` to match, e.g. `-p 3000:4000`.
-- `.timeline-data/` on the host holds the database and log file, so enrichment results survive container restarts.
-- To avoid putting the API key in your shell history, use `--env-file timeline.env` with the same `NAME=value` lines instead of `-e`.
-
-**Security:** the server has no authentication. By default it is reachable from your local network, so only run it on trusted networks. To allow only the local machine, publish the port as `-p 127.0.0.1:3000:3000` in Docker, or set `TIMELINE_HTTP_HOST=127.0.0.1` when running without Docker.
 
 ## Tools
 
@@ -121,16 +99,7 @@ A visit is labelled using the first available of: your alias, Home/Work from Goo
 
 ## Searching places
 
-`search_places` and `when_was_i_at_place` take a free-text query. A place matches when **every word** of the query appears somewhere in what is known about it: its name, address, postcode, city, category, or Google type. Partial words count, capitals and accents don't matter, and small words like *in*, *at*, *the*, *bij*, and *de* are ignored.
-
-| Query | Finds |
-|---|---|
-| `Bakker in Meppel` | "Bakkerij Jansen, Hoofdstraat 1, Meppel", but not bakeries in other towns |
-| `Meppel` | every place in Meppel |
-| `bakery` | every place Google classifies as a bakery |
-| `cafe` | "Café de Kroon" |
-
-The assistant typically calls `search_places` first to see which places match and how often you went there. It then passes the chosen place's `placeKey` to `when_was_i_at_place` to get the dates.
+`search_places` and `when_was_i_at_place` take a free-text query. A place matches when **every word** appears in its name, address, city, or category. Partial words count, capitals and accents don't matter, and small words like *in*, *the*, and *de* are ignored. For example, `Bakker in Meppel` finds "Bakkerij Jansen, Hoofdstraat 1, Meppel" but not bakeries in other towns, and `cafe` finds "Café de Kroon".
 
 Names and categories come from `enrich_places`, so run that first. With `TIMELINE_GOOGLE_PLACES_LANGUAGE=nl`, Dutch words like *bakker* and *supermarkt* work as well as English ones.
 
@@ -141,10 +110,10 @@ Optionally give places your own names with a JSON file set in `TIMELINE_ALIASES_
 ```json
 {
   "placeIds": {
-    "ChIJN1t_tDeuEmsRUsoyG83frY4": "Favourite office"
+    "ChIJN1t_tDeuEmsRUsoyG83frY4": "Ten Forward"
   },
   "semanticTypes": {
-    "WORK": "Office"
+    "WORK": "The Bridge"
   }
 }
 ```
@@ -152,8 +121,10 @@ Optionally give places your own names with a JSON file set in `TIMELINE_ALIASES_
 ## Development
 
 ```bash
+npm install
 npm test
 npm run build
+TIMELINE_JSON_PATH=/path/to/Timeline.json TIMELINE_DB_PATH=/path/to/timeline.db npm run dev
 ```
 
 ## License

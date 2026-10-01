@@ -19,6 +19,7 @@ describe('loadConfig', () => {
       geocoderUserAgent: 'timeline-mcp-test/1.0',
       logLevel: 'DEBUG',
       logFile: '/tmp/timeline.log',
+      transport: 'stdio',
       httpHost: '0.0.0.0',
       httpPort: 3000
     });
@@ -87,6 +88,13 @@ describe('loadConfig', () => {
         TIMELINE_HTTP_PORT: 'abc'
       })
     ).toThrow('TIMELINE_HTTP_PORT must be a valid integer');
+  });
+
+  it('reads transport', () => {
+    const base = { TIMELINE_JSON_PATH: '/tmp/Tijdlijn.json', TIMELINE_DB_PATH: '/tmp/timeline.db' };
+
+    expect(loadConfig({ ...base, TIMELINE_TRANSPORT: 'stdio' }).transport).toBe('stdio');
+    expect(() => loadConfig({ ...base, TIMELINE_TRANSPORT: 'sse' })).toThrow('TIMELINE_TRANSPORT must be "http" or "stdio"');
   });
 
   it('reads google places requests per minute', () => {
